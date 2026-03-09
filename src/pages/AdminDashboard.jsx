@@ -11,7 +11,7 @@ const presentacionesPorTipo = {
 const formatearNombre = (texto) => {
   return texto
     .split(' ') 
-    .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1)) // Capitaliza la primera letra
+    .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1)) 
     .join(' '); 
 };
 
@@ -21,7 +21,6 @@ export default function AdminDashboard() {
 
   // ================= ESTADOS =================
   const [carta, setCarta] = useState([]);
-  // El estado inicial carga con las opciones por defecto del plato
   const [nuevoItem, setNuevoItem] = useState({ nombre: '', tipo: 'plato', presentacion: presentacionesPorTipo['plato'][0], descripcion: '', precio: '' });
   const [itemEditando, setItemEditando] = useState(null); 
 
@@ -55,7 +54,6 @@ export default function AdminDashboard() {
     await fetch('https://fiestas-backend.onrender.com/api/carta', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(nuevoItem)
     });
-    // Reiniciar al valor por defecto
     setNuevoItem({ nombre: '', tipo: 'plato', presentacion: presentacionesPorTipo['plato'][0], descripcion: '', precio: '' });
     cargarCarta();
   };
@@ -97,8 +95,15 @@ export default function AdminDashboard() {
 
   // ================= FUNCIONES USUARIOS =================
   const cargarUsuarios = async () => {
-    const res = await fetch('https://fiestas-backend.onrender.com/api/usuarios');
-    setUsuarios(await res.json());
+    try {
+      const res = await fetch('https://fiestas-backend.onrender.com/api/usuarios');
+      const data = await res.json();
+      // PROTECCIÓN: Nos aseguramos de que siempre sea un array
+      setUsuarios(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error al cargar usuarios:", error);
+      setUsuarios([]);
+    }
   };
 
   const handleAgregarUsuario = async (e) => {
@@ -158,15 +163,13 @@ export default function AdminDashboard() {
           <h2>Agregar Nuevo Producto</h2>
           <form onSubmit={handleAgregarItem} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '30px', alignItems: 'center' }}>
             
-            {/* 1. Nombre */}
             <input type="text" className="input-field" placeholder="Nombre (Ej: Ceviche)" value={nuevoItem.nombre} onChange={e => setNuevoItem({ ...nuevoItem, nombre: formatearNombre(e.target.value) })} required style={{ flex: '1.5', minWidth: '150px' }} />            
-            {/* 2. Tipo (Controla la presentación) */}
             <select className="input-field" value={nuevoItem.tipo} onChange={e => {
                 const nuevoTipo = e.target.value;
                 setNuevoItem({ 
                   ...nuevoItem, 
                   tipo: nuevoTipo, 
-                  presentacion: presentacionesPorTipo[nuevoTipo][0] // Auto-selecciona la primera opción correcta
+                  presentacion: presentacionesPorTipo[nuevoTipo][0] 
                 });
               }} style={{ flex: '1', minWidth: '120px' }}>
               <option value="plato">Plato</option>
@@ -174,19 +177,14 @@ export default function AdminDashboard() {
               <option value="gaseosa">Gaseosa</option>
             </select>
 
-            {/* 3. Presentación (Dinámico) */}
             <select className="input-field" value={nuevoItem.presentacion} onChange={e => setNuevoItem({ ...nuevoItem, presentacion: e.target.value })} style={{ flex: '1', minWidth: '130px' }}>
               {presentacionesPorTipo[nuevoItem.tipo].map(opcion => (
                 <option key={opcion} value={opcion}>{opcion}</option>
               ))}
             </select>
 
-            {/* 4. Descripción */}
             <input type="text" className="input-field" placeholder="Descripción (Opcional)" value={nuevoItem.descripcion} onChange={e => setNuevoItem({ ...nuevoItem, descripcion: e.target.value })} style={{ flex: '2', minWidth: '150px' }} />
-            
-            {/* 5. Precio */}
             <input type="number" step="0.10" className="input-field" placeholder="Precio (S/)" value={nuevoItem.precio} onChange={e => setNuevoItem({ ...nuevoItem, precio: e.target.value })} required style={{ flex: '0.8', minWidth: '80px' }} />
-            
             <button type="submit" className="btn-primary" style={{ width: 'auto', marginTop: '-10px' }}>Agregar</button>
           </form>
 
@@ -308,17 +306,26 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {usuarios.map(u => (
-                  <tr key={u.id} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '10px' }}>{u.id}</td>
-                    <td style={{ padding: '10px' }}><strong>{u.nombre_usuario}</strong></td>
-                    <td style={{ padding: '10px', textTransform: 'capitalize' }}>{u.rol}</td>
-                    <td style={{ padding: '10px', display: 'flex', gap: '5px' }}>
-                      <button onClick={() => setUsuarioEditando({ id: u.id, nombre_usuario: u.nombre_usuario, rol: u.rol, password: '' })} style={{ padding: '5px 10px', background: 'var(--playa-sol)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Editar</button>
-                      <button onClick={() => eliminarUsuario(u.id)} style={{ padding: '5px 10px', background: '#e63946', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Borrar</button>
+                {/* PROTECCIÓN: Mensaje si no hay usuarios */}
+                {usuarios.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                      No hay mozos ni cocineros registrados todavía.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  usuarios.map(u => (
+                    <tr key={u.id} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '10px' }}>{u.id}</td>
+                      <td style={{ padding: '10px' }}><strong>{u.nombre_usuario}</strong></td>
+                      <td style={{ padding: '10px', textTransform: 'capitalize' }}>{u.rol}</td>
+                      <td style={{ padding: '10px', display: 'flex', gap: '5px' }}>
+                        <button onClick={() => setUsuarioEditando({ id: u.id, nombre_usuario: u.nombre_usuario, rol: u.rol, password: '' })} style={{ padding: '5px 10px', background: 'var(--playa-sol)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Editar</button>
+                        <button onClick={() => eliminarUsuario(u.id)} style={{ padding: '5px 10px', background: '#e63946', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Borrar</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -339,7 +346,6 @@ export default function AdminDashboard() {
               <label>Tipo</label>
               <select className="input-field" value={itemEditando.tipo} onChange={e => {
                   const nuevoTipo = e.target.value;
-                  // Si cambia el tipo, asignamos por defecto la primera presentación válida de ese tipo
                   setItemEditando({ ...itemEditando, tipo: nuevoTipo, presentacion: presentacionesPorTipo[nuevoTipo][0] });
                 }}>
                 <option value="plato">Plato</option>
@@ -373,18 +379,18 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Modal Edición Usuario */}
+      {/* Modal Edición Usuario con PROTECCIÓN */}
       {usuarioEditando && (
         <div style={modalOverlayStyle}>
           <div className="card" style={modalContentStyle}>
             <h2>Editar Usuario</h2>
             <form onSubmit={guardarEdicionUsuario}>
               <label>Nombre de Usuario</label>
-              <input type="text" className="input-field" value={usuarioEditando.nombre_usuario} onChange={e => setUsuarioEditando({ ...usuarioEditando, nombre_usuario: e.target.value })} required />
+              <input type="text" className="input-field" value={usuarioEditando?.nombre_usuario || ''} onChange={e => setUsuarioEditando({ ...usuarioEditando, nombre_usuario: e.target.value })} required />
               <label>Nueva Contraseña <small>(Dejar en blanco para no cambiar)</small></label>
-              <input type="password" className="input-field" placeholder="***" value={usuarioEditando.password} onChange={e => setUsuarioEditando({ ...usuarioEditando, password: e.target.value })} />
+              <input type="password" className="input-field" placeholder="***" value={usuarioEditando?.password || ''} onChange={e => setUsuarioEditando({ ...usuarioEditando, password: e.target.value })} />
               <label>Rol</label>
-              <select className="input-field" value={usuarioEditando.rol} onChange={e => setUsuarioEditando({ ...usuarioEditando, rol: e.target.value })}>
+              <select className="input-field" value={usuarioEditando?.rol || 'mozo'} onChange={e => setUsuarioEditando({ ...usuarioEditando, rol: e.target.value })}>
                 <option value="mozo">Mozo</option>
                 <option value="cocina">Cocina</option>
               </select>
