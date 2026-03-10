@@ -147,8 +147,20 @@ export default function AdminDashboard() {
 
       {/* --- CABECERA --- */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{ color: 'var(--playa-mar)' }}>Panel de Administración 🌊</h1>
-        <button onClick={cerrarSesion} style={{ padding: '8px 15px', backgroundColor: '#e63946', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Cerrar Sesión</button>
+        
+        {/* Contenedor para juntar el logo y el título */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <img 
+            src="/logo.png" 
+            alt="Logo Fiestas" 
+            style={{ height: '60px', width: '60px', objectFit: 'cover', borderRadius: '50%' }} 
+          />
+          <h1 style={{ color: 'var(--playa-mar)', margin: 0 }}>Panel de Administración 🌊</h1>
+        </div>
+
+        <button onClick={cerrarSesion} style={{ padding: '8px 15px', backgroundColor: '#e63946', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
+          Cerrar Sesión
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
