@@ -4,9 +4,17 @@ import { useNavigate } from 'react-router-dom';
 const PlatoCard = ({ plato, onAgregar }) => {
   const [idSeleccionado, setIdSeleccionado] = useState(plato.variaciones[0].id);
   const [cantidad, setCantidad] = useState(1);
-  const variacionActual = plato.variaciones.find(v => v.id == idSeleccionado);
+
+  // NUEVO: Si la carta se filtra y el plato cambia, reseteamos el ID a la primera opción válida
+  useEffect(() => {
+    setIdSeleccionado(plato.variaciones[0].id);
+  }, [plato.nombre]);
+
+  // PROTECCIÓN: Si por alguna razón no lo encuentra, toma el primero por defecto
+  const variacionActual = plato.variaciones.find(v => v.id == idSeleccionado) || plato.variaciones[0];
 
   const handleAgregar = () => {
+    if (!variacionActual) return; // Escudo extra
     onAgregar(variacionActual, cantidad);
     setCantidad(1);
   };
@@ -31,17 +39,17 @@ const PlatoCard = ({ plato, onAgregar }) => {
 export default function MozoDashboard() {
   const navigate = useNavigate();
   const [mozo, setMozo] = useState(null);
-  const [tabActivo, setTabActivo] = useState('nueva'); 
-  
+  const [tabActivo, setTabActivo] = useState('nueva');
+
   // Datos y Filtros
   const [cartaAgrupada, setCartaAgrupada] = useState([]);
   const [filtroTipo, setFiltroTipo] = useState('todos'); // NUEVO FILTRO
-  
+
   // Carrito y Edición
   const [carrito, setCarrito] = useState([]);
   const [notaComanda, setNotaComanda] = useState(''); // NUEVA NOTA
   const [comandaTarget, setComandaTarget] = useState(null); // Para saber si editamos una orden
-  
+
   const [misComandas, setMisComandas] = useState([]);
 
   useEffect(() => {
@@ -69,14 +77,15 @@ export default function MozoDashboard() {
   };
 
   const agregarAlCarrito = (variacion, cant) => {
+    if (!variacion) return;
     const itemExistente = carrito.find(item => item.item_id == variacion.id);
     if (itemExistente) {
-      setCarrito(carrito.map(item => 
+      setCarrito(carrito.map(item =>
         item.item_id == variacion.id ? { ...item, cantidad: item.cantidad + cant } : item
       ));
     } else {
-      setCarrito([...carrito, { 
-        item_id: variacion.id, nombre: variacion.nombre, presentacion: variacion.presentacion, precio_unitario: variacion.precio, cantidad: cant 
+      setCarrito([...carrito, {
+        item_id: variacion.id, nombre: variacion.nombre, presentacion: variacion.presentacion, precio_unitario: variacion.precio, cantidad: cant
       }]);
     }
   };
@@ -106,7 +115,7 @@ export default function MozoDashboard() {
 
   const procesarComanda = async () => {
     if (carrito.length === 0) return alert('El carrito está vacío');
-    
+
     if (comandaTarget) {
       // AGREGAR A UNA COMANDA EXISTENTE
       await fetch(`https://fiestas-backend.onrender.com/api/comandas/${comandaTarget}/agregar-items`, {
@@ -121,7 +130,7 @@ export default function MozoDashboard() {
       });
       alert('Comanda nueva enviada a cocina');
     }
-    
+
     setCarrito([]); setNotaComanda(''); setTabActivo('mis_comandas');
   };
 
@@ -137,14 +146,14 @@ export default function MozoDashboard() {
   };
 
   const eliminarComandaEntera = async (id) => {
-    if(window.confirm('¿Seguro que deseas eliminar toda la comanda?')) {
+    if (window.confirm('¿Seguro que deseas eliminar toda la comanda?')) {
       await fetch(`https://fiestas-backend.onrender.com/api/comandas/${id}`, { method: 'DELETE' });
       cargarMisComandas();
     }
   };
 
   const eliminarPlatoDeComanda = async (detalle_id) => {
-    if(window.confirm('¿Quitar este plato de la orden?')) {
+    if (window.confirm('¿Quitar este plato de la orden?')) {
       await fetch(`https://fiestas-backend.onrender.com/api/detalles_comanda/${detalle_id}`, { method: 'DELETE' });
       cargarMisComandas();
     }
@@ -152,19 +161,19 @@ export default function MozoDashboard() {
 
   const registrarPago = async (id) => {
     const metodo = document.getElementById(`pago-${id}`).value;
-    if(window.confirm(`¿Confirmar pago por S/ ${misComandas.find(c=>c.id === id).total} usando ${metodo.toUpperCase()}?`)) {
+    if (window.confirm(`¿Confirmar pago por S/ ${misComandas.find(c => c.id === id).total} usando ${metodo.toUpperCase()}?`)) {
       await fetch(`https://fiestas-backend.onrender.com/api/comandas/${id}/pago`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metodo_pago: metodo })
       });
-      cargarMisComandas(); 
+      cargarMisComandas();
     }
   };
 
   const cerrarSesion = () => { localStorage.removeItem('usuarioFiestas'); navigate('/login'); };
 
   // Filtrado de la carta
-  const cartaFiltrada = filtroTipo === 'todos' 
-    ? cartaAgrupada 
+  const cartaFiltrada = filtroTipo === 'todos'
+    ? cartaAgrupada
     : cartaAgrupada.filter(plato => plato.variaciones[0].tipo === filtroTipo);
 
   // Colores de estado
@@ -195,7 +204,7 @@ export default function MozoDashboard() {
       {/* ==================== PESTAÑA: TOMAR PEDIDO ==================== */}
       {tabActivo === 'nueva' && (
         <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-          
+
           <div className="card" style={{ flex: '2', minWidth: '300px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '15px' }}>
               <h2 style={{ margin: 0 }}>Carta</h2>
@@ -206,12 +215,12 @@ export default function MozoDashboard() {
                 <option value="gaseosa">🥤 Gaseosas</option>
               </select>
             </div>
-            {cartaFiltrada.map((plato, idx) => <PlatoCard key={idx} plato={plato} onAgregar={agregarAlCarrito} />)}
-          </div>
-          
+              {cartaFiltrada.map(plato => <PlatoCard key={plato.nombre} plato={plato} onAgregar={agregarAlCarrito} />)}       
+            </div>
+
           <div className="card" style={{ flex: '1', minWidth: '250px', backgroundColor: comandaTarget ? '#fff3cd' : 'var(--playa-celeste)', border: comandaTarget ? '2px solid #ffb703' : 'none' }}>
             <h2>{comandaTarget ? `Agregando a Orden #${comandaTarget}` : 'Orden Actual'}</h2>
-            
+
             {!comandaTarget && (
               <input type="text" className="input-field" placeholder="Mesa, Nombre o Nota (Opcional)" value={notaComanda} onChange={e => setNotaComanda(e.target.value)} style={{ backgroundColor: 'white' }} />
             )}
@@ -220,9 +229,9 @@ export default function MozoDashboard() {
               <ul style={{ listStyle: 'none', padding: 0 }}>
                 {carrito.map((item, idx) => (
                   <li key={idx} style={{ background: 'white', padding: '10px', marginBottom: '5px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between' }}>
-                    <div><strong>{item.cantidad}x {item.nombre}</strong> <br/><small>({item.presentacion})</small></div>
-<div style={{ textAlign: 'right' }}>
-                      <span>S/ {(item.cantidad * item.precio_unitario).toFixed(2)}</span><br/>
+                    <div><strong>{item.cantidad}x {item.nombre}</strong> <br /><small>({item.presentacion})</small></div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span>S/ {(item.cantidad * item.precio_unitario).toFixed(2)}</span><br />
                       <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
                         <button onClick={() => disminuirDelCarrito(idx)} style={{ background: '#fff3cd', border: '1px solid orange', borderRadius: '4px', cursor: 'pointer', padding: '2px 8px' }}>-1</button>
                         <button onClick={() => quitarDelCarrito(idx)} style={{ background: '#ffcccc', border: '1px solid red', color: 'red', borderRadius: '4px', cursor: 'pointer', padding: '2px 8px' }}>X Todo</button>
@@ -232,11 +241,11 @@ export default function MozoDashboard() {
               </ul>
             )}
             <h3 style={{ borderTop: '2px solid white', paddingTop: '10px' }}>Total a agregar: S/ {totalCarrito.toFixed(2)}</h3>
-            
+
             <button className="btn-primary" style={{ backgroundColor: 'var(--playa-sol)', color: 'var(--texto-oscuro)' }} onClick={procesarComanda}>
               {comandaTarget ? 'Guardar en Comanda Existente' : 'Enviar a Cocina'}
             </button>
-            
+
             {comandaTarget && (
               <button onClick={cancelarEdicion} style={{ width: '100%', marginTop: '10px', background: 'none', border: 'none', color: 'red', textDecoration: 'underline', cursor: 'pointer' }}>
                 Cancelar edición
@@ -255,72 +264,73 @@ export default function MozoDashboard() {
               {misComandas.map(comanda => {
                 const esPagado = comanda.estado_pago === 'pagado';
                 return (
-                <div key={comanda.id} style={{ border: `2px solid ${esPagado ? '#ccc' : 'var(--playa-mar)'}`, borderRadius: '8px', padding: '15px', width: '320px', backgroundColor: esPagado ? '#f9f9f9' : 'white', opacity: esPagado ? 0.8 : 1 }}>
-                  
-                  {/* Cabecera Tarjeta */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ margin: 0 }}>Comanda #{comanda.id}</h3>
-                    {!esPagado && (
-                      <span style={{ color: 'white', background: getColorEstado(comanda.estado), padding: '4px 10px', borderRadius: '15px', fontSize: '0.8em', fontWeight: 'bold' }}>
-                        {comanda.estado.toUpperCase()}
-                      </span>
-                    )}
-                    {esPagado && <span style={{ color: '#2a9d8f', fontWeight: 'bold' }}>✓ PAGADO</span>}
-                  </div>
+                  <div key={comanda.id} style={{ border: `2px solid ${esPagado ? '#ccc' : 'var(--playa-mar)'}`, borderRadius: '8px', padding: '15px', width: '320px', backgroundColor: esPagado ? '#f9f9f9' : 'white', opacity: esPagado ? 0.8 : 1 }}>
 
-                  {/* Nota / Identificador */}
-                  {comanda.nota && (
-                    <p style={{ margin: '5px 0', color: '#666', fontStyle: 'italic' }}>📌 {comanda.nota}</p>
-                  )}
-                  
-                  {/* Lista de Platos */}
-                  <ul style={{ paddingLeft: '0', marginTop: '15px', listStyle: 'none' }}>
-                    {comanda.items.map(det => (
-                      <li key={det.detalle_id} style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px dashed #eee', paddingBottom: '8px' }}>
-                        <div>
-                          <strong>{det.cantidad}x</strong> {det.nombre} <small>({det.presentacion})</small> <br/>
-                          {!esPagado && (
-                            <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
-                              <button onClick={() => disminuirUnPlato(det.detalle_id)} style={{ fontSize: '0.8em', background: '#fff3cd', border: '1px solid orange', borderRadius: '4px', cursor: 'pointer' }}>-1 (Restar)</button>
-                              <button onClick={() => eliminarPlatoDeComanda(det.detalle_id)} style={{ fontSize: '0.8em', background: '#ffcccc', border: '1px solid red', borderRadius: '4px', cursor: 'pointer' }}>Borrar todos</button>
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ fontWeight: 'bold', color: 'var(--playa-mar)' }}>
-                          S/ {(det.cantidad * det.precio_unitario).toFixed(2)}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {!esPagado && (
-                     <button onClick={() => iniciarEdicionComanda(comanda.id)} style={{ width: '100%', padding: '8px', marginBottom: '10px', backgroundColor: '#e9ecef', border: '1px dashed #ccc', borderRadius: '5px', cursor: 'pointer' }}>
-                       + Agregar más productos a esta orden
-                     </button>
-                  )}
-
-                  <h3 style={{ textAlign: 'right', color: esPagado ? '#666' : 'black' }}>Total: S/ {parseFloat(comanda.total).toFixed(2)}</h3>
-                  
-                  {/* ZONA DE COBRO (Solo si no está pagado) */}
-                  {!esPagado && (
-                    <div style={{ marginTop: '15px', borderTop: '1px solid #ccc', paddingTop: '15px' }}>
-                      <label style={{ fontSize: '0.9em', color: '#666', marginBottom: '5px', display: 'block' }}>Método de Pago:</label>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <select id={`pago-${comanda.id}`} className="input-field" style={{ margin: 0, flex: 1, padding: '8px' }}>
-                          <option value="efectivo">Efectivo 💵</option>
-                          <option value="yape">Yape / Plin 📱</option>
-                          <option value="tarjeta">Tarjeta 💳</option>
-                        </select>
-                        <button onClick={() => registrarPago(comanda.id)} className="btn-primary" style={{ backgroundColor: '#2a9d8f', flex: 1, padding: '8px' }}>Cobrar</button>
-                      </div>
-                      <div style={{ textAlign: 'center', marginTop: '15px' }}>
-                         <button onClick={() => eliminarComandaEntera(comanda.id)} style={{ background: 'none', border: 'none', color: 'red', textDecoration: 'underline', cursor: 'pointer' }}>Anular toda la comanda</button>
-                      </div>
+                    {/* Cabecera Tarjeta */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0 }}>Comanda #{comanda.id}</h3>
+                      {!esPagado && (
+                        <span style={{ color: 'white', background: getColorEstado(comanda.estado), padding: '4px 10px', borderRadius: '15px', fontSize: '0.8em', fontWeight: 'bold' }}>
+                          {comanda.estado.toUpperCase()}
+                        </span>
+                      )}
+                      {esPagado && <span style={{ color: '#2a9d8f', fontWeight: 'bold' }}>✓ PAGADO</span>}
                     </div>
-                  )}
-                  
-                </div>
-              )})}
+
+                    {/* Nota / Identificador */}
+                    {comanda.nota && (
+                      <p style={{ margin: '5px 0', color: '#666', fontStyle: 'italic' }}>📌 {comanda.nota}</p>
+                    )}
+
+                    {/* Lista de Platos */}
+                    <ul style={{ paddingLeft: '0', marginTop: '15px', listStyle: 'none' }}>
+                      {comanda.items.map(det => (
+                        <li key={det.detalle_id} style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px dashed #eee', paddingBottom: '8px' }}>
+                          <div>
+                            <strong>{det.cantidad}x</strong> {det.nombre} <small>({det.presentacion})</small> <br />
+                            {!esPagado && (
+                              <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
+                                <button onClick={() => disminuirUnPlato(det.detalle_id)} style={{ fontSize: '0.8em', background: '#fff3cd', border: '1px solid orange', borderRadius: '4px', cursor: 'pointer' }}>-1 (Restar)</button>
+                                <button onClick={() => eliminarPlatoDeComanda(det.detalle_id)} style={{ fontSize: '0.8em', background: '#ffcccc', border: '1px solid red', borderRadius: '4px', cursor: 'pointer' }}>Borrar todos</button>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontWeight: 'bold', color: 'var(--playa-mar)' }}>
+                            S/ {(det.cantidad * det.precio_unitario).toFixed(2)}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {!esPagado && (
+                      <button onClick={() => iniciarEdicionComanda(comanda.id)} style={{ width: '100%', padding: '8px', marginBottom: '10px', backgroundColor: '#e9ecef', border: '1px dashed #ccc', borderRadius: '5px', cursor: 'pointer' }}>
+                        + Agregar más productos a esta orden
+                      </button>
+                    )}
+
+                    <h3 style={{ textAlign: 'right', color: esPagado ? '#666' : 'black' }}>Total: S/ {parseFloat(comanda.total).toFixed(2)}</h3>
+
+                    {/* ZONA DE COBRO (Solo si no está pagado) */}
+                    {!esPagado && (
+                      <div style={{ marginTop: '15px', borderTop: '1px solid #ccc', paddingTop: '15px' }}>
+                        <label style={{ fontSize: '0.9em', color: '#666', marginBottom: '5px', display: 'block' }}>Método de Pago:</label>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <select id={`pago-${comanda.id}`} className="input-field" style={{ margin: 0, flex: 1, padding: '8px' }}>
+                            <option value="efectivo">Efectivo 💵</option>
+                            <option value="yape">Yape / Plin 📱</option>
+                            <option value="tarjeta">Tarjeta 💳</option>
+                          </select>
+                          <button onClick={() => registrarPago(comanda.id)} className="btn-primary" style={{ backgroundColor: '#2a9d8f', flex: 1, padding: '8px' }}>Cobrar</button>
+                        </div>
+                        <div style={{ textAlign: 'center', marginTop: '15px' }}>
+                          <button onClick={() => eliminarComandaEntera(comanda.id)} style={{ background: 'none', border: 'none', color: 'red', textDecoration: 'underline', cursor: 'pointer' }}>Anular toda la comanda</button>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
