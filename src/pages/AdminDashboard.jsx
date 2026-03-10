@@ -114,7 +114,7 @@ export default function AdminDashboard() {
     const data = await res.json();
     if (data.success) {
       setNuevoUsuario({ nombre_usuario: '', password: '', rol: 'mozo' });
-      cargarUsuarios();
+      await cargarUsuarios();
     } else alert(data.message);
   };
 
