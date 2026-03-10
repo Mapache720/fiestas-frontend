@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// --- DICCIONARIO DE PRESENTACIONES DINÁMICAS ---
 const presentacionesPorTipo = {
   plato: ['Personal', 'Familiar'],
   cerveza: ['Botella Normal', 'Personal', 'Lata'],
@@ -9,11 +8,11 @@ const presentacionesPorTipo = {
 };
 
 const formatearNombre = (texto) => {
-  return texto
-    .split(' ') 
-    .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1)) 
-    .join(' '); 
+  return texto.split(' ').map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1)).join(' '); 
 };
+
+// Función para obtener la fecha actual en formato YYYY-MM-DD
+const obtenerFechaHoy = () => new Date().toISOString().split('T')[0];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -24,8 +23,11 @@ export default function AdminDashboard() {
   const [nuevoItem, setNuevoItem] = useState({ nombre: '', tipo: 'plato', presentacion: presentacionesPorTipo['plato'][0], descripcion: '', precio: '' });
   const [itemEditando, setItemEditando] = useState(null); 
 
-  const [periodo, setPeriodo] = useState('mes');
+  // NUEVO: Filtros por defecto en 'hoy' y con estado para el calendario
+  const [periodo, setPeriodo] = useState('hoy');
+  const [fechaEspecifica, setFechaEspecifica] = useState(obtenerFechaHoy());
   const [ganancias, setGanancias] = useState({ detalles: [], totalGeneral: 0 });
+  
   const [comandasCompletadas, setComandasCompletadas] = useState([]);
   const [filtroMozo, setFiltroMozo] = useState('todos');
 
@@ -41,7 +43,7 @@ export default function AdminDashboard() {
       cargarComandasCompletadas();
     }
     if (tabActivo === 'usuarios') cargarUsuarios();
-  }, [tabActivo, periodo]);
+  }, [tabActivo, periodo, fechaEspecifica]); // Agregamos fechaEspecifica como dependencia
 
   // ================= FUNCIONES CARTA =================
   const cargarCarta = async () => {
@@ -78,19 +80,18 @@ export default function AdminDashboard() {
 
   // ================= FUNCIONES GANANCIAS =================
   const cargarGanancias = async () => {
-    const res = await fetch(`https://fiestas-backend.onrender.com/api/ganancias?periodo=${periodo}`);
+    // Modificado para enviar la fecha específica si es necesario
+    const res = await fetch(`https://fiestas-backend.onrender.com/api/ganancias?periodo=${periodo}&fecha=${fechaEspecifica}`);
     setGanancias(await res.json());
   };
 
   const cargarComandasCompletadas = async () => {
-    const res = await fetch('https://fiestas-backend.onrender.com/api/admin/comandas-completadas');
+    // Modificado para enviar la fecha específica si es necesario
+    const res = await fetch(`https://fiestas-backend.onrender.com/api/admin/comandas-completadas?periodo=${periodo}&fecha=${fechaEspecifica}`);
     setComandasCompletadas(await res.json());
   };
 
-  const comandasFiltradas = filtroMozo === 'todos'
-    ? comandasCompletadas
-    : comandasCompletadas.filter(c => c.mozo === filtroMozo);
-
+  const comandasFiltradas = filtroMozo === 'todos' ? comandasCompletadas : comandasCompletadas.filter(c => c.mozo === filtroMozo);
   const mozosUnicos = [...new Set(comandasCompletadas.map(c => c.mozo))];
 
   // ================= FUNCIONES USUARIOS =================
@@ -98,7 +99,6 @@ export default function AdminDashboard() {
     try {
       const res = await fetch('https://fiestas-backend.onrender.com/api/usuarios');
       const data = await res.json();
-      // PROTECCIÓN: Nos aseguramos de que siempre sea un array
       setUsuarios(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error al cargar usuarios:", error);
@@ -162,27 +162,18 @@ export default function AdminDashboard() {
         <div className="card">
           <h2>Agregar Nuevo Producto</h2>
           <form onSubmit={handleAgregarItem} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '30px', alignItems: 'center' }}>
-            
             <input type="text" className="input-field" placeholder="Nombre (Ej: Ceviche)" value={nuevoItem.nombre} onChange={e => setNuevoItem({ ...nuevoItem, nombre: formatearNombre(e.target.value) })} required style={{ flex: '1.5', minWidth: '150px' }} />            
             <select className="input-field" value={nuevoItem.tipo} onChange={e => {
                 const nuevoTipo = e.target.value;
-                setNuevoItem({ 
-                  ...nuevoItem, 
-                  tipo: nuevoTipo, 
-                  presentacion: presentacionesPorTipo[nuevoTipo][0] 
-                });
+                setNuevoItem({ ...nuevoItem, tipo: nuevoTipo, presentacion: presentacionesPorTipo[nuevoTipo][0] });
               }} style={{ flex: '1', minWidth: '120px' }}>
               <option value="plato">Plato</option>
               <option value="cerveza">Cerveza</option>
               <option value="gaseosa">Gaseosa</option>
             </select>
-
             <select className="input-field" value={nuevoItem.presentacion} onChange={e => setNuevoItem({ ...nuevoItem, presentacion: e.target.value })} style={{ flex: '1', minWidth: '130px' }}>
-              {presentacionesPorTipo[nuevoItem.tipo].map(opcion => (
-                <option key={opcion} value={opcion}>{opcion}</option>
-              ))}
+              {presentacionesPorTipo[nuevoItem.tipo].map(opcion => <option key={opcion} value={opcion}>{opcion}</option>)}
             </select>
-
             <input type="text" className="input-field" placeholder="Descripción (Opcional)" value={nuevoItem.descripcion} onChange={e => setNuevoItem({ ...nuevoItem, descripcion: e.target.value })} style={{ flex: '2', minWidth: '150px' }} />
             <input type="number" step="0.10" className="input-field" placeholder="Precio (S/)" value={nuevoItem.precio} onChange={e => setNuevoItem({ ...nuevoItem, precio: e.target.value })} required style={{ flex: '0.8', minWidth: '80px' }} />
             <button type="submit" className="btn-primary" style={{ width: 'auto', marginTop: '-10px' }}>Agregar</button>
@@ -219,15 +210,32 @@ export default function AdminDashboard() {
       {tabActivo === 'ganancias' && (
         <>
           <div className="card" style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <h2>Reporte de Ingresos</h2>
-              <select className="input-field" value={periodo} onChange={e => setPeriodo(e.target.value)} style={{ width: '200px' }}>
-                <option value="semana">Esta Semana</option>
-                <option value="mes">Este Mes</option>
-                <option value="anio">Este Año</option>
-                <option value="todo">Histórico Total</option>
-              </select>
+              
+              {/* NUEVO: Zona de filtros con calendario */}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <select className="input-field" value={periodo} onChange={e => setPeriodo(e.target.value)} style={{ width: '200px', margin: 0 }}>
+                  <option value="hoy">Hoy</option>
+                  <option value="semana">Esta Semana</option>
+                  <option value="mes">Este Mes</option>
+                  <option value="anio">Este Año</option>
+                  <option value="dia_especifico">Día Específico...</option>
+                  <option value="todo">Histórico Total</option>
+                </select>
+                
+                {periodo === 'dia_especifico' && (
+                  <input 
+                    type="date" 
+                    className="input-field" 
+                    value={fechaEspecifica} 
+                    onChange={e => setFechaEspecifica(e.target.value)} 
+                    style={{ margin: 0, padding: '8px' }}
+                  />
+                )}
+              </div>
             </div>
+
             <div style={{ backgroundColor: 'var(--playa-celeste)', padding: '20px', borderRadius: '8px', textAlign: 'center', margin: '20px 0' }}>
               <h3 style={{ margin: '0 0 10px 0', color: 'var(--texto-oscuro)' }}>Total Recaudado</h3>
               <h1 style={{ margin: '0', fontSize: '3rem', color: 'var(--playa-mar)' }}>S/ {ganancias.totalGeneral.toFixed(2)}</h1>
@@ -236,7 +244,7 @@ export default function AdminDashboard() {
 
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
-              <h2 style={{ margin: 0 }}>Historial de Comandas Completadas</h2>
+              <h2 style={{ margin: 0 }}>Historial de Comandas ({periodo === 'dia_especifico' ? fechaEspecifica : periodo})</h2>
               <select className="input-field" value={filtroMozo} onChange={e => setFiltroMozo(e.target.value)} style={{ width: 'auto', margin: 0 }}>
                 <option value="todos">Filtrar por Mozo (Todos)</option>
                 {mozosUnicos.map(m => <option key={m} value={m}>{m}</option>)}
@@ -244,24 +252,16 @@ export default function AdminDashboard() {
             </div>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', marginTop: '20px' }}>
-              {comandasFiltradas.length === 0 ? <p>No hay comandas terminadas en el historial.</p> : null}
+              {comandasFiltradas.length === 0 ? <p>No hay comandas terminadas en este período.</p> : null}
               {comandasFiltradas.map(c => (
                 <div key={c.id} style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '15px', width: '300px', backgroundColor: '#fafafa' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                     <strong>Ticket #{c.id}</strong>
                     <span style={{ color: '#2a9d8f', fontWeight: 'bold' }}>✓ Pagado</span>
                   </div>
-                  
-                  <small style={{ color: '#666', display: 'block' }}>
-                    📅 <strong>Fecha:</strong> {new Date(c.creado_en).toLocaleString('es-PE')}
-                  </small>
-                  <small style={{ color: '#666', display: 'block' }}>
-                    👨‍🍳 <strong>Mozo:</strong> {c.mozo}
-                  </small>
-                  <small style={{ color: 'var(--playa-mar)', fontWeight: 'bold', display: 'block', marginTop: '5px' }}>
-                    💳 Pago con: {c.metodo_pago ? c.metodo_pago.toUpperCase() : 'EFECTIVO'}
-                  </small>
-                  
+                  <small style={{ color: '#666', display: 'block' }}>📅 <strong>Fecha:</strong> {new Date(c.creado_en).toLocaleString('es-PE')}</small>
+                  <small style={{ color: '#666', display: 'block' }}>👨‍🍳 <strong>Mozo:</strong> {c.mozo}</small>
+                  <small style={{ color: 'var(--playa-mar)', fontWeight: 'bold', display: 'block', marginTop: '5px' }}>💳 Pago con: {c.metodo_pago ? c.metodo_pago.toUpperCase() : 'EFECTIVO'}</small>
                   <ul style={{ paddingLeft: '20px', fontSize: '0.9em', marginTop: '10px' }}>
                     {c.items.map((item, idx) => (
                       <li key={idx}>{item.cantidad}x {item.nombre} ({item.presentacion}) - S/{item.precio_unitario}</li>
@@ -306,13 +306,8 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {/* PROTECCIÓN: Mensaje si no hay usuarios */}
                 {usuarios.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                      No hay mozos ni cocineros registrados todavía.
-                    </td>
-                  </tr>
+                  <tr><td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No hay mozos ni cocineros registrados todavía.</td></tr>
                 ) : (
                   usuarios.map(u => (
                     <tr key={u.id} style={{ borderBottom: '1px solid #eee' }}>
@@ -332,44 +327,28 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ================= MODALES (Ventanas Flotantes) ================= */}
-
-      {/* Modal Edición Carta */}
+      {/* ================= MODALES ================= */}
       {itemEditando && (
         <div style={modalOverlayStyle}>
           <div className="card" style={modalContentStyle}>
             <h2>Editar Producto</h2>
             <form onSubmit={guardarEdicionCarta}>
-              
               <label>Nombre</label>
               <input type="text" className="input-field" value={itemEditando.nombre} onChange={e => setItemEditando({ ...itemEditando, nombre: formatearNombre(e.target.value) })} required />
               <label>Tipo</label>
-              <select className="input-field" value={itemEditando.tipo} onChange={e => {
-                  const nuevoTipo = e.target.value;
-                  setItemEditando({ ...itemEditando, tipo: nuevoTipo, presentacion: presentacionesPorTipo[nuevoTipo][0] });
-                }}>
+              <select className="input-field" value={itemEditando.tipo} onChange={e => setItemEditando({ ...itemEditando, tipo: e.target.value, presentacion: presentacionesPorTipo[e.target.value][0] })}>
                 <option value="plato">Plato</option>
                 <option value="cerveza">Cerveza</option>
                 <option value="gaseosa">Gaseosa</option>
               </select>
-
               <label>Presentación</label>
               <select className="input-field" value={itemEditando.presentacion} onChange={e => setItemEditando({ ...itemEditando, presentacion: e.target.value })}>
-                {presentacionesPorTipo[itemEditando.tipo] ? (
-                  presentacionesPorTipo[itemEditando.tipo].map(opcion => (
-                    <option key={opcion} value={opcion}>{opcion}</option>
-                  ))
-                ) : (
-                  <option value={itemEditando.presentacion}>{itemEditando.presentacion}</option>
-                )}
+                {presentacionesPorTipo[itemEditando.tipo] ? presentacionesPorTipo[itemEditando.tipo].map(opcion => <option key={opcion} value={opcion}>{opcion}</option>) : <option value={itemEditando.presentacion}>{itemEditando.presentacion}</option>}
               </select>
-
               <label>Descripción</label>
               <input type="text" className="input-field" value={itemEditando.descripcion} onChange={e => setItemEditando({ ...itemEditando, descripcion: e.target.value })} />
-              
               <label>Precio (S/)</label>
               <input type="number" step="0.10" className="input-field" value={itemEditando.precio} onChange={e => setItemEditando({ ...itemEditando, precio: e.target.value })} required />
-              
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="submit" className="btn-primary">Guardar Cambios</button>
                 <button type="button" className="btn-primary" style={{ backgroundColor: '#666' }} onClick={() => setItemEditando(null)}>Cancelar</button>
@@ -379,7 +358,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Modal Edición Usuario con PROTECCIÓN */}
       {usuarioEditando && (
         <div style={modalOverlayStyle}>
           <div className="card" style={modalContentStyle}>
@@ -402,14 +380,9 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
 
-const modalOverlayStyle = {
-  position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-};
-const modalContentStyle = {
-  width: '100%', maxWidth: '400px', padding: '30px', backgroundColor: 'white', borderRadius: '12px'
-};
+const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
+const modalContentStyle = { width: '100%', maxWidth: '400px', padding: '30px', backgroundColor: 'white', borderRadius: '12px' };
